@@ -34,7 +34,7 @@ pip install -r requirements.txt
 1. Index your documents:
 
 ```
-python index_documents.py --input_dir /path/to/your/documents
+python index_documents.py --input_dir /path/to/your/documents --file_type markdown --collection_name my_collection
 ```
 
 2. Run the application:
