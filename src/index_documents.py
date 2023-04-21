@@ -8,10 +8,16 @@ from langchain.document_loaders import TextLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Milvus
+from langchain.document_loaders import UnstructuredMarkdownLoader
 
-def load_documents(file_path, encoding='utf8'):
-    loader = TextLoader(file_path, encoding=encoding)
+
+def load_documents(file_path, encoding='utf8', file_type='text'):
+    if file_type == 'markdown':
+        loader = UnstructuredMarkdownLoader(file_path)
+    else:
+        loader = TextLoader(file_path, encoding=encoding)
     return loader.load()
+
 
 def split_documents(documents, chunk_size=1000, chunk_overlap=0):
     text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
@@ -47,7 +53,8 @@ if __name__ == "__main__":
     parser.add_argument('--chunk_overlap', type=int, default=0, help='Number of overlapping characters between consecutive chunks.')
     parser.add_argument('--host', type=str, default="127.0.0.1", help='Host address for the Milvus server.')
     parser.add_argument('--port', type=str, default="19530", help='Port for the Milvus server.')
+    parser.add_argument('--file_type', type=str, default="text", choices=["text", "markdown"], help='Type of the input files (text or markdown).')
 
     args = parser.parse_args()
 
-    main(args.input_dir, args.encoding, args.chunk_size, args.chunk_overlap, args.host, args.port)
+    main(args.input_dir, args.encoding, args.chunk_size, args.chunk_overlap, args.host, args.port, args.file_type)
