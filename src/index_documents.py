@@ -24,27 +24,26 @@ def split_documents(documents, chunk_size=1000, chunk_overlap=0):
     return text_splitter.split_documents(documents)
 
 
-def index_documents(docs, embeddings, connection_args):
-    vector_db = Milvus.from_documents(
-        docs,
-        embeddings,
-        connection_args=connection_args,
-    )
-    return vector_db
+def index_documents(docs, embeddings, connection_args, collection_name):
+    # Instantiate a Milvus client and index the documents
+    milvus = Milvus(embedding_function=embeddings, connection_args=connection_args, collection_name=collection_name)
+    milvus.add_documents(docs)
 
 
-def main(input_dir, encoding, chunk_size, chunk_overlap, host, port):
+def main(input_dir, encoding, chunk_size, chunk_overlap, host, port, file_type, collection_name):
     # Iterate through all the files in the input directory and process each one
     for file in os.listdir(input_dir):
         file_path = os.path.join(input_dir, file)
         if os.path.isfile(file_path):
             print(f"Processing {file_path}...")
-            documents = load_documents(file_path, encoding)
+            documents = load_documents(file_path, encoding, file_type)
             docs = split_documents(documents, chunk_size, chunk_overlap)
             embeddings = OpenAIEmbeddings()
-            vector_db = index_documents(docs, embeddings, {"host": host, "port": port})
+            index_documents(docs, embeddings, {"host": host, "port": port}, collection_name)
             print(f"Indexed {len(docs)} chunks from {file_path}.")
 
+
+# python index_documents.py --input_dir /path/to/your/documents --file_type markdown --collection_name my_collection
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Index documents for Question Answering over Documents application.")
     parser.add_argument('--input_dir', type=str, required=True, help='Path to the directory containing documents to be indexed.')
@@ -54,7 +53,8 @@ if __name__ == "__main__":
     parser.add_argument('--host', type=str, default="127.0.0.1", help='Host address for the Milvus server.')
     parser.add_argument('--port', type=str, default="19530", help='Port for the Milvus server.')
     parser.add_argument('--file_type', type=str, default="text", choices=["text", "markdown"], help='Type of the input files (text or markdown).')
+    parser.add_argument('--collection_name', type=str, required=True, help='Name of the collection to index the documents into.')
 
     args = parser.parse_args()
 
-    main(args.input_dir, args.encoding, args.chunk_size, args.chunk_overlap, args.host, args.port, args.file_type)
+    main(args.input_dir, args.encoding, args.chunk_size, args.chunk_overlap, args.host, args.port, args.file_type, args.collection_name)
