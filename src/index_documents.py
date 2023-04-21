@@ -24,13 +24,14 @@ def split_documents(documents, chunk_size=1000, chunk_overlap=0):
     return text_splitter.split_documents(documents)
 
 
-def index_documents(docs, embeddings, connection_args, collection_name):
-    # Instantiate a Milvus client and index the documents
-    milvus = Milvus(embedding_function=embeddings, connection_args=connection_args, collection_name=collection_name)
-    milvus.add_documents(docs)
+def index_documents(milvus, docs, embeddings):
+    # Index the documents using the provided Milvus instance
+    milvus.add_documents(docs, embeddings)
 
 
 def main(input_dir, encoding, chunk_size, chunk_overlap, host, port, file_type, collection_name):
+    embeddings = OpenAIEmbeddings()
+    milvus = Milvus(connection_args={"host": host, "port": port}, collection_name=collection_name)
     # Iterate through all the files in the input directory and process each one
     for file in os.listdir(input_dir):
         file_path = os.path.join(input_dir, file)
@@ -38,8 +39,7 @@ def main(input_dir, encoding, chunk_size, chunk_overlap, host, port, file_type, 
             print(f"Processing {file_path}...")
             documents = load_documents(file_path, encoding, file_type)
             docs = split_documents(documents, chunk_size, chunk_overlap)
-            embeddings = OpenAIEmbeddings()
-            index_documents(docs, embeddings, {"host": host, "port": port}, collection_name)
+            index_documents(milvus, docs, embeddings)
             print(f"Indexed {len(docs)} chunks from {file_path}.")
 
 
