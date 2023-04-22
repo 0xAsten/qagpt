@@ -10,6 +10,13 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Milvus
 from langchain.document_loaders import UnstructuredMarkdownLoader
 
+from pymilvus import FieldSchema, DataType, CollectionSchema, Collection, connections, utility
+
+
+text_field = "otext"
+primary_field = "id"
+vector_field = "embedding"
+
 
 def load_documents(file_path, encoding='utf8', file_type='text'):
     if file_type == 'markdown':
@@ -24,14 +31,53 @@ def split_documents(documents, chunk_size=1000, chunk_overlap=0):
     return text_splitter.split_documents(documents)
 
 
-def index_documents(milvus, docs, embeddings):
+def index_documents(milvus, docs):
     # Index the documents using the provided Milvus instance
-    milvus.add_documents(docs, embeddings)
+    milvus.add_documents(docs)
 
+def create_milvus_collection(embeddings, collection_name, host, port):
+    # Connect to Milvus instance
+    if not connections.has_connection("default"):
+        connections.connect(host=host, port=port)
+    utility.drop_collection(collection_name)
+    # Create the collection in Milvus
+    fields = []
+    # Create the text field
+    fields.append(
+        FieldSchema(text_field, DataType.VARCHAR, max_length=1500)
+    )
+    # Create the primary key field
+    fields.append(
+        FieldSchema(primary_field, DataType.INT64, is_primary=True, auto_id=True)
+    )
+    # Create the vector field
+    fields.append(FieldSchema(vector_field, DataType.FLOAT_VECTOR, dim=1536))
+    # Create the schema for the collection
+    schema = CollectionSchema(fields)
+    # Create the collection
+    collection = Collection(collection_name, schema)
+    # Index parameters for the collection
+    index = {
+        "index_type": "HNSW",
+        "metric_type": "L2",
+        "params": {"M": 8, "efConstruction": 64},
+    }
+    # Create the index
+    collection.create_index(vector_field, index)
+
+    # Create the VectorStore
+    milvus = Milvus(
+        embeddings,
+        {"host": host, "port": port},
+        collection_name,
+        text_field,
+    )
+
+    return milvus
 
 def main(input_dir, encoding, chunk_size, chunk_overlap, host, port, file_type, collection_name):
     embeddings = OpenAIEmbeddings()
-    milvus = Milvus(connection_args={"host": host, "port": port}, collection_name=collection_name)
+    milvus = create_milvus_collection(embeddings, collection_name, host, port)
     # Iterate through all the files in the input directory and process each one
     for file in os.listdir(input_dir):
         file_path = os.path.join(input_dir, file)
@@ -39,7 +85,7 @@ def main(input_dir, encoding, chunk_size, chunk_overlap, host, port, file_type, 
             print(f"Processing {file_path}...")
             documents = load_documents(file_path, encoding, file_type)
             docs = split_documents(documents, chunk_size, chunk_overlap)
-            index_documents(milvus, docs, embeddings)
+            index_documents(milvus, docs)
             print(f"Indexed {len(docs)} chunks from {file_path}.")
 
 
