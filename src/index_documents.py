@@ -42,6 +42,10 @@ def create_milvus_collection(embeddings, collection_name, host, port):
     utility.drop_collection(collection_name)
     # Create the collection in Milvus
     fields = []
+    # Create the metadata field
+    fields.append(
+        FieldSchema('source', DataType.VARCHAR, max_length=200)
+    )
     # Create the text field
     fields.append(
         FieldSchema(text_field, DataType.VARCHAR, max_length=1500)

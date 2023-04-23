@@ -1,3 +1,7 @@
 venv
 
 .firebaserc
+
+docs
+
+.DS_Store
