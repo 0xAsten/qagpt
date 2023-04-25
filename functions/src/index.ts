@@ -4,6 +4,7 @@
 // export MILVUS_URL=YOUR_MILVUS_URL_HERE
 // for example http://localhost:19530
 import * as functions from 'firebase-functions'
+import { defineString } from 'firebase-functions/params'
 // import { MilvusClient } from '@zilliz/milvus2-sdk-node'
 import { Milvus } from 'langchain/vectorstores/milvus'
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
@@ -13,14 +14,21 @@ import { OpenAI } from 'langchain/llms/openai'
 // const MILVUS_HOST = process.env.MILVUS_HOST || '127.0.0.1'
 // const MILVUS_PORT = process.env.MILVUS_PORT || '19530'
 // const milvus = new MilvusClient(`http://${MILVUS_HOST}:${MILVUS_PORT}`)
+// const COLLECTION_NAME = process.env.COLLECTION_NAME || 'your_collection_name'
 
-const COLLECTION_NAME = process.env.COLLECTION_NAME || 'your_collection_name'
+// const collection_name = defineString('COLLECTION_NAME', {
+//   default: 'Cairo1',
+//   description: 'The name of the collection to use in Milvus',
+// })
 
-async function get_similar_documents(question: string) {
+async function get_similar_documents(
+  question: string,
+  collection_name: string
+) {
   const vectorStore = await Milvus.fromExistingCollection(
     new OpenAIEmbeddings(),
     {
-      collectionName: COLLECTION_NAME,
+      collectionName: collection_name,
       textField: 'otext',
     }
   )
@@ -30,10 +38,13 @@ async function get_similar_documents(question: string) {
   return response
 }
 
-export async function generate_answer(question: string) {
+export async function generate_answer(
+  question: string,
+  collection_name: string
+) {
   // Use GPT-4 to generate an answer based on the question and similar_docs
   // const answer = your_gpt_model_generate_answer_code_here
-  const relevantDocs = await get_similar_documents(question)
+  const relevantDocs = await get_similar_documents(question, collection_name)
 
   const model = new OpenAI({ temperature: 0 })
   const chain = loadQARefineChain(model)
@@ -49,10 +60,10 @@ export async function generate_answer(question: string) {
 
 export const question_answering = functions.https.onRequest(
   async (request, response) => {
-    const question = request.body.question
+    const { question, collection_name } = request.body
 
     if (question) {
-      const answer = await generate_answer(question)
+      const answer = await generate_answer(question, collection_name)
       response.status(200).send(answer)
     } else {
       response
