@@ -23,23 +23,22 @@ import { SecretParam } from 'firebase-functions/lib/params/types'
 // })
 
 const openApiKey = defineSecret('OPENAI_API_KEY')
+const milvus_host = defineString('MILVUS_HOST', {
+  // default: '127.0.0.1',
+  description: 'The host of the Milvus server',
+})
+const milvus_port = defineString('MILVUS_PORT', {
+  default: '19530',
+  description: 'The port of the Milvus server',
+})
 
 async function get_similar_documents(
   question: string,
   collection_name: string,
   openApiKey: SecretParam
 ) {
-  const milvus_host = defineString('MILVUS_HOST', {
-    default: '127.0.0.1',
-    description: 'The host of the Milvus server',
-  })
-
-  const milvus_port = defineString('MILVUS_PORT', {
-    default: '19530',
-    description: 'The port of the Milvus server',
-  })
-
-  const url = `http://${milvus_host}:${milvus_port}`
+  const url = `http://${milvus_host.value()}:${milvus_port.value()}`
+  console.log(url)
 
   const vectorStore = await Milvus.fromExistingCollection(
     new OpenAIEmbeddings({ openAIApiKey: openApiKey.value() }),

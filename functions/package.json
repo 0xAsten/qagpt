@@ -18,7 +18,8 @@
     "@zilliz/milvus2-sdk-node": "^2.2.6",
     "firebase-admin": "^11.5.0",
     "firebase-functions": "^4.2.0",
-    "langchain": "^0.0.61"
+    "langchain": "^0.0.61",
+    "typeorm": "^0.3.15"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^5.12.0",
