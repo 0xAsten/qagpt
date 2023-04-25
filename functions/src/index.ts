@@ -4,12 +4,13 @@
 // export MILVUS_URL=YOUR_MILVUS_URL_HERE
 // for example http://localhost:19530
 import * as functions from 'firebase-functions'
-import { defineString } from 'firebase-functions/params'
+import { defineString, defineSecret } from 'firebase-functions/params'
 // import { MilvusClient } from '@zilliz/milvus2-sdk-node'
 import { Milvus } from 'langchain/vectorstores/milvus'
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
 import { loadQARefineChain } from 'langchain/chains'
 import { OpenAI } from 'langchain/llms/openai'
+import { SecretParam } from 'firebase-functions/lib/params/types'
 
 // const MILVUS_HOST = process.env.MILVUS_HOST || '127.0.0.1'
 // const MILVUS_PORT = process.env.MILVUS_PORT || '19530'
@@ -21,15 +22,31 @@ import { OpenAI } from 'langchain/llms/openai'
 //   description: 'The name of the collection to use in Milvus',
 // })
 
+const openApiKey = defineSecret('OPENAI_API_KEY')
+
 async function get_similar_documents(
   question: string,
-  collection_name: string
+  collection_name: string,
+  openApiKey: SecretParam
 ) {
+  const milvus_host = defineString('MILVUS_HOST', {
+    default: '127.0.0.1',
+    description: 'The host of the Milvus server',
+  })
+
+  const milvus_port = defineString('MILVUS_PORT', {
+    default: '19530',
+    description: 'The port of the Milvus server',
+  })
+
+  const url = `http://${milvus_host}:${milvus_port}`
+
   const vectorStore = await Milvus.fromExistingCollection(
-    new OpenAIEmbeddings(),
+    new OpenAIEmbeddings({ openAIApiKey: openApiKey.value() }),
     {
       collectionName: collection_name,
       textField: 'otext',
+      url,
     }
   )
 
@@ -38,14 +55,9 @@ async function get_similar_documents(
   return response
 }
 
-export async function generate_answer(
-  question: string,
-  collection_name: string
-) {
+export async function generate_answer(question: string, relevantDocs: any) {
   // Use GPT-4 to generate an answer based on the question and similar_docs
   // const answer = your_gpt_model_generate_answer_code_here
-  const relevantDocs = await get_similar_documents(question, collection_name)
-
   const model = new OpenAI({ temperature: 0 })
   const chain = loadQARefineChain(model)
 
@@ -58,17 +70,22 @@ export async function generate_answer(
   return res
 }
 
-export const question_answering = functions.https.onRequest(
-  async (request, response) => {
+export const question_answering = functions
+  .runWith({ secrets: [openApiKey] })
+  .https.onRequest(async (request, response) => {
     const { question, collection_name } = request.body
 
     if (question) {
-      const answer = await generate_answer(question, collection_name)
+      const similar_docs = await get_similar_documents(
+        question,
+        collection_name,
+        openApiKey
+      )
+      const answer = await generate_answer(question, similar_docs)
       response.status(200).send(answer)
     } else {
       response
         .status(400)
         .send({ error: 'Invalid input. Please provide a question.' })
     }
-  }
-)
+  })
