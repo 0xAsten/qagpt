@@ -1,4 +1,4 @@
-# Langchain wraps the Milvus client and provides a few convenience methods for working with documents. 
+# Langchain wraps the Milvus client and provides a few convenience methods for working with documents.
 # It can split documents into chunks, embed them, and store them in Milvus.
 
 import os
@@ -27,13 +27,15 @@ def load_documents(file_path, encoding='utf8', file_type='text'):
 
 
 def split_documents(documents, chunk_size=1000, chunk_overlap=0):
-    text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    text_splitter = CharacterTextSplitter(
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     return text_splitter.split_documents(documents)
 
 
 def index_documents(milvus, docs):
     # Index the documents using the provided Milvus instance
     milvus.add_documents(docs)
+
 
 def create_milvus_collection(embeddings, collection_name, host, port):
     # Connect to Milvus instance
@@ -52,7 +54,8 @@ def create_milvus_collection(embeddings, collection_name, host, port):
     )
     # Create the primary key field
     fields.append(
-        FieldSchema(primary_field, DataType.INT64, is_primary=True, auto_id=True)
+        FieldSchema(primary_field, DataType.INT64,
+                    is_primary=True, auto_id=True)
     )
     # Create the vector field
     fields.append(FieldSchema(vector_field, DataType.FLOAT_VECTOR, dim=1536))
@@ -79,6 +82,7 @@ def create_milvus_collection(embeddings, collection_name, host, port):
 
     return milvus
 
+
 def main(input_dir, encoding, chunk_size, chunk_overlap, host, port, file_type, collection_name):
     embeddings = OpenAIEmbeddings()
     milvus = create_milvus_collection(embeddings, collection_name, host, port)
@@ -95,16 +99,26 @@ def main(input_dir, encoding, chunk_size, chunk_overlap, host, port, file_type, 
 
 # python index_documents.py --input_dir /path/to/your/documents --file_type markdown --collection_name my_collection
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Index documents for Question Answering over Documents application.")
-    parser.add_argument('--input_dir', type=str, required=True, help='Path to the directory containing documents to be indexed.')
-    parser.add_argument('--encoding', type=str, default='utf8', help='Encoding of the input documents.')
-    parser.add_argument('--chunk_size', type=int, default=1000, help='Size of the chunks to split documents into.')
-    parser.add_argument('--chunk_overlap', type=int, default=0, help='Number of overlapping characters between consecutive chunks.')
-    parser.add_argument('--host', type=str, default="127.0.0.1", help='Host address for the Milvus server.')
-    parser.add_argument('--port', type=str, default="19530", help='Port for the Milvus server.')
-    parser.add_argument('--file_type', type=str, default="text", choices=["text", "markdown"], help='Type of the input files (text or markdown).')
-    parser.add_argument('--collection_name', type=str, required=True, help='Name of the collection to index the documents into.')
+    parser = argparse.ArgumentParser(
+        description="Index documents for Question Answering over Documents application.")
+    parser.add_argument('--input_dir', type=str, required=True,
+                        help='Path to the directory containing documents to be indexed.')
+    parser.add_argument('--encoding', type=str, default='utf8',
+                        help='Encoding of the input documents.')
+    parser.add_argument('--chunk_size', type=int, default=1000,
+                        help='Size of the chunks to split documents into.')
+    parser.add_argument('--chunk_overlap', type=int, default=0,
+                        help='Number of overlapping characters between consecutive chunks.')
+    parser.add_argument('--host', type=str, default="127.0.0.1",
+                        help='Host address for the Milvus server.')
+    parser.add_argument('--port', type=str, default="19530",
+                        help='Port for the Milvus server.')
+    parser.add_argument('--file_type', type=str, default="text", choices=[
+                        "text", "markdown"], help='Type of the input files (text or markdown).')
+    parser.add_argument('--collection_name', type=str, required=True,
+                        help='Name of the collection to index the documents into.')
 
     args = parser.parse_args()
 
-    main(args.input_dir, args.encoding, args.chunk_size, args.chunk_overlap, args.host, args.port, args.file_type, args.collection_name)
+    main(args.input_dir, args.encoding, args.chunk_size, args.chunk_overlap,
+         args.host, args.port, args.file_type, args.collection_name)

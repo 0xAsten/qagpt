@@ -149,9 +149,9 @@ if __name__ == "__main__":
                         help='Size of the chunks to split documents into.')
     parser.add_argument('--chunk_overlap', type=int, default=0,
                         help='Number of overlapping characters between consecutive chunks.')
-    parser.add_argument('--username', type=str, default="127.0.0.1",
+    parser.add_argument('--username', type=str,
                         help='username for the Redis server.')
-    parser.add_argument('--password', type=str, default="6379",
+    parser.add_argument('--password', type=str,
                         help='password for the Redis server.')
     parser.add_argument('--host', type=str, default="127.0.0.1",
                         help='Host address for the Redis server.')
