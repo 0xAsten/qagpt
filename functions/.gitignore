@@ -8,4 +8,4 @@ typings/
 # Node.js dependency directory
 node_modules/
 
-.env.qagpt-384709
+.env
