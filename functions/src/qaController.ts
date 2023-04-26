@@ -5,7 +5,7 @@ import { loadQARefineChain } from 'langchain/chains'
 import { OpenAI } from 'langchain/llms/openai'
 import { Request, Response } from 'express'
 import { getErrorMessage } from './utils'
-// import { MilvusClient } from '@zilliz/milvus2-sdk-node'
+import { PassThrough } from 'stream'
 
 export async function get_similar_documents(
   question: string,
@@ -23,6 +23,9 @@ export async function get_similar_documents(
     }
   )
 
+  const des = await vectorStore.client.describeCollection({ collection_name })
+  console.log(des)
+
   const response = await vectorStore.similaritySearch(question, 4)
 
   return response
@@ -31,20 +34,30 @@ export async function get_similar_documents(
 export async function generate_answer(
   question: string,
   relevantDocs: any,
-  openApiKey: string
+  openApiKey: string,
+  passThrough: PassThrough
 ) {
   // Use GPT-4 to generate an answer based on the question and similar_docs
   // const answer = your_gpt_model_generate_answer_code_here
-  const model = new OpenAI({ temperature: 0, openAIApiKey: openApiKey })
+  const model = new OpenAI({
+    streaming: true,
+    temperature: 0,
+    openAIApiKey: openApiKey,
+    callbacks: [
+      {
+        handleLLMNewToken(token: string) {
+          passThrough.write(token)
+        },
+      },
+    ],
+  })
   const chain = loadQARefineChain(model)
 
   // Call the chain
-  const res = await chain.call({
+  await chain.call({
     input_documents: relevantDocs,
     question,
   })
-
-  return res
 }
 
 export const questionAnswering = functions
@@ -52,6 +65,9 @@ export const questionAnswering = functions
   .https.onRequest(async (req: Request, res: Response) => {
     const { question, collection_name } = req.body
     const openApiKey = process.env.OPENAI_KEY
+
+    const passThrough = new PassThrough()
+    passThrough.pipe(res)
 
     if (!openApiKey) {
       res.status(400).json({
@@ -68,13 +84,16 @@ export const questionAnswering = functions
           collection_name,
           openApiKey
         )
-        const answer = await generate_answer(question, similar_docs, openApiKey)
-        console.log(answer)
+        console.log('similar_docs:' + similar_docs)
 
-        res.status(200).send({
-          status: 'success',
-          data: answer,
-        })
+        await generate_answer(question, similar_docs, openApiKey, passThrough)
+
+        passThrough.end()
+
+        // res.status(200).send({
+        //   status: 'success',
+        //   data: answer,
+        // })
       } catch (error) {
         res.status(500).json(getErrorMessage(error))
       }
