@@ -1,4 +1,3 @@
-import * as functions from 'firebase-functions'
 import { Milvus } from 'langchain/vectorstores/milvus'
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
 import { loadQARefineChain } from 'langchain/chains'
@@ -23,10 +22,13 @@ export async function get_similar_documents(
     }
   )
 
-  const des = await vectorStore.client.describeCollection({ collection_name })
-  console.log(des)
-
-  const response = await vectorStore.similaritySearch(question, 4)
+  let response
+  try {
+    response = await vectorStore.similaritySearch(question, 4)
+  } catch (error) {
+    console.log('similaritySearch error:' + error)
+    throw error
+  }
 
   return response
 }
@@ -60,42 +62,42 @@ export async function generate_answer(
   })
 }
 
-export const questionAnswering = functions
-  .runWith({ secrets: ['OPENAI_KEY'] })
-  .https.onRequest(async (req: Request, res: Response) => {
-    const { question, collection_name } = req.body
-    const openApiKey = process.env.OPENAI_KEY
+const questionAnswering = async (req: Request, res: Response) => {
+  const { question, collection_name } = req.body
+  const openApiKey = process.env.OPENAI_KEY
 
-    const passThrough = new PassThrough()
-    passThrough.pipe(res)
+  const passThrough = new PassThrough()
+  passThrough.pipe(res)
 
-    if (!openApiKey) {
-      res.status(400).json({
-        message: 'Please provide an OpenAI API key.',
-      })
-    } else if (!question) {
-      res.status(400).json({
-        message: 'Invalid input. Please provide a question.',
-      })
-    } else {
-      try {
-        const similar_docs = await get_similar_documents(
-          question,
-          collection_name,
-          openApiKey
-        )
-        console.log('similar_docs:' + similar_docs)
+  if (!openApiKey) {
+    res.status(400).json({
+      message: 'Please provide an OpenAI API key.',
+    })
+  } else if (!question) {
+    res.status(400).json({
+      message: 'Invalid input. Please provide a question.',
+    })
+  } else {
+    try {
+      const similar_docs = await get_similar_documents(
+        question,
+        collection_name,
+        openApiKey
+      )
+      console.log('similar_docs:' + similar_docs)
 
-        await generate_answer(question, similar_docs, openApiKey, passThrough)
+      await generate_answer(question, similar_docs, openApiKey, passThrough)
 
-        passThrough.end()
+      passThrough.end()
 
-        // res.status(200).send({
-        //   status: 'success',
-        //   data: answer,
-        // })
-      } catch (error) {
-        res.status(500).json(getErrorMessage(error))
-      }
+      // res.status(200).send({
+      //   status: 'success',
+      //   data: answer,
+      // })
+    } catch (error) {
+      res.status(500).json(getErrorMessage(error))
     }
-  })
+  }
+}
+
+export { questionAnswering }

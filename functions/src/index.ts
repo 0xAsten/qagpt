@@ -5,7 +5,9 @@ import { questionAnswering } from './qaController'
 
 const app = express()
 
-app.use(cors())
+const corsHandler = cors({ origin: true })
+
+app.use(corsHandler)
 
 app.get('/', (req, res) => res.status(200).send('Hey, there!'))
 app.post('/qa', questionAnswering)

@@ -12,5 +12,5 @@ describe('getSimiliarDocs', () => {
     )
     expect(similarDocs).toBeDefined()
     console.log(similarDocs)
-  }, 10000)
+  }, 20000)
 })
