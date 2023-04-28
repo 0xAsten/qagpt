@@ -13,9 +13,9 @@ from langchain.document_loaders import UnstructuredMarkdownLoader
 from pymilvus import FieldSchema, DataType, CollectionSchema, Collection, connections, utility
 
 
-text_field = "otext"
-primary_field = "id"
-vector_field = "embedding"
+text_field = "text"
+primary_field = "pk"
+vector_field = "vector"
 
 
 def load_documents(file_path, encoding='utf8', file_type='text'):
