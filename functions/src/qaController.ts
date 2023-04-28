@@ -1,10 +1,13 @@
+// https://stackoverflow.com/questions/73275346/how-to-stream-data-to-the-browser-with-google-cloud-functions-so-that-download-s/73370059#73370059?newreg=c0f1a7819e66426eb3a3a44e996bbbf0
+// eslint-disable-next-line max-len
+// Streaming is not possible from Firebase Functions because of the buffering implementation.
+
 import { Milvus } from 'langchain/vectorstores/milvus'
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
 import { loadQARefineChain } from 'langchain/chains'
 import { OpenAI } from 'langchain/llms/openai'
 import { Request, Response } from 'express'
 import { getErrorMessage } from './utils'
-import { PassThrough } from 'stream'
 
 export async function get_similar_documents(
   question: string,
@@ -36,23 +39,8 @@ export async function get_similar_documents(
 export async function generate_answer(
   question: string,
   relevantDocs: any,
-  openApiKey: string,
-  passThrough: PassThrough
+  model: OpenAI
 ) {
-  // Use GPT-4 to generate an answer based on the question and similar_docs
-  // const answer = your_gpt_model_generate_answer_code_here
-  const model = new OpenAI({
-    streaming: true,
-    temperature: 0,
-    openAIApiKey: openApiKey,
-    callbacks: [
-      {
-        handleLLMNewToken(token: string) {
-          passThrough.write(token)
-        },
-      },
-    ],
-  })
   const chain = loadQARefineChain(model)
 
   // Call the chain
@@ -66,8 +54,7 @@ const questionAnswering = async (req: Request, res: Response) => {
   const { question, collection_name } = req.body
   const openApiKey = process.env.OPENAI_KEY
 
-  const passThrough = new PassThrough()
-  passThrough.pipe(res)
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8')
 
   if (!openApiKey) {
     res.status(400).json({
@@ -86,9 +73,21 @@ const questionAnswering = async (req: Request, res: Response) => {
       )
       console.log('similar_docs:' + similar_docs)
 
-      await generate_answer(question, similar_docs, openApiKey, passThrough)
+      const model = new OpenAI({
+        streaming: true,
+        temperature: 0,
+        openAIApiKey: openApiKey,
+        callbacks: [
+          {
+            handleLLMNewToken: (token: string) => {
+              res.write(token)
+            },
+          },
+        ],
+      })
+      await generate_answer(question, similar_docs, model)
 
-      passThrough.end()
+      res.end()
 
       // res.status(200).send({
       //   status: 'success',
