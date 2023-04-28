@@ -1,6 +1,8 @@
 // https://stackoverflow.com/questions/73275346/how-to-stream-data-to-the-browser-with-google-cloud-functions-so-that-download-s/73370059#73370059?newreg=c0f1a7819e66426eb3a3a44e996bbbf0
 // eslint-disable-next-line max-len
 // Streaming is not possible from Firebase Functions because of the buffering implementation.
+// eslint-disable-next-line max-len
+// If you want to successfully invoke OpenAI's API be sure use node 18 engine in your package.json
 
 import { Milvus } from 'langchain/vectorstores/milvus'
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
