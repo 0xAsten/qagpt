@@ -4,13 +4,16 @@
 import os
 import argparse
 
-from langchain.document_loaders import TextLoader
+from langchain.document_loaders import TextLoader, GitLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Milvus
-from langchain.document_loaders import UnstructuredMarkdownLoader
+from langchain.document_loaders import UnstructuredMarkdownLoader, DirectoryLoader
+from langchain.document_loaders.text import TextLoader
+
 
 from pymilvus import FieldSchema, DataType, CollectionSchema, Collection, connections, utility
+from git import Repo
 
 
 text_field = "text"
@@ -24,6 +27,48 @@ def load_documents(file_path, encoding='utf8', file_type='text'):
     else:
         loader = TextLoader(file_path, encoding=encoding)
     return loader.load()
+
+
+def load_documents_from_github(github_url, file_type, collection_name):
+    repoPath = "./docs/" + collection_name
+    githubUrl = github_url
+    # check if the repo exists
+    if os.path.exists(repoPath):
+        print("Repo already exists")
+        githubUrl = None
+
+    loader = GitLoader(
+        clone_url=githubUrl,
+        repo_path=repoPath,
+        branch="main",
+        file_filter=lambda file_path: file_path.endswith(
+            ".{}".format(file_type)),
+    )
+
+    return loader.load()
+
+
+def load_documents_from_directory(file_type, collection_name):
+    path = "./docs/" + collection_name
+    loader = DirectoryLoader(
+        path=path,
+        glob="**/*.{}".format(file_type),
+        loader_cls=TextLoader
+    )
+
+    return loader.load()
+
+
+def clone_from_github(github_url, collection_name):
+    path = "./docs/" + collection_name
+    if os.path.exists(path):
+        print("Repo already exists")
+        return
+
+    repo = Repo.clone_from(
+        github_url, to_path=path
+    )
+    repo.git.checkout("main")
 
 
 def split_documents(documents, chunk_size=1000, chunk_overlap=0):
@@ -50,7 +95,7 @@ def create_milvus_collection(embeddings, collection_name, host, port):
     )
     # Create the text field
     fields.append(
-        FieldSchema(text_field, DataType.VARCHAR, max_length=1500)
+        FieldSchema(text_field, DataType.VARCHAR, max_length=2500)
     )
     # Create the primary key field
     fields.append(
@@ -83,25 +128,40 @@ def create_milvus_collection(embeddings, collection_name, host, port):
     return milvus
 
 
-def main(input_dir, encoding, chunk_size, chunk_overlap, host, port, file_type, collection_name):
+def main(input_dir, encoding, chunk_size, chunk_overlap, host, port, file_type, collection_name, github_url):
     embeddings = OpenAIEmbeddings()
     milvus = create_milvus_collection(embeddings, collection_name, host, port)
-    # Iterate through all the files in the input directory and process each one
-    for file in os.listdir(input_dir):
-        file_path = os.path.join(input_dir, file)
-        if os.path.isfile(file_path):
-            print(f"Processing {file_path}...")
-            documents = load_documents(file_path, encoding, file_type)
-            docs = split_documents(documents, chunk_size, chunk_overlap)
-            index_documents(milvus, docs)
-            print(f"Indexed {len(docs)} chunks from {file_path}.")
+
+    documents = []
+    if input_dir is not None:
+        # Iterate through all the files in the input directory and process each one
+
+        for file in os.listdir(input_dir):
+            file_path = os.path.join(input_dir, file)
+            if os.path.isfile(file_path):
+                print(f"Processing {file_path}...")
+                loadedDocuments = load_documents(
+                    file_path, encoding, file_type)
+                # concat two lists
+                documents = documents + loadedDocuments
+        docs = split_documents(documents, chunk_size, chunk_overlap)
+        index_documents(milvus, docs)
+        print(f"Indexed {len(docs)} chunks from {input_dir}.")
+
+    if github_url is not None:
+        documents = load_documents_from_directory(file_type, collection_name)
+        docs = split_documents(documents, chunk_size, chunk_overlap)
+        index_documents(milvus, docs)
+        print(f"Indexed {len(docs)} chunks from {github_url}.")
+
+    print("Done!")
 
 
-# python index_documents.py --input_dir /path/to/your/documents --file_type markdown --collection_name my_collection
+# python src/index_documents.py --input_dir /path/to/your/documents --file_type markdown --collection_name my_collection
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Index documents for Question Answering over Documents application.")
-    parser.add_argument('--input_dir', type=str, required=True,
+    parser.add_argument('--input_dir', type=str, default=None,
                         help='Path to the directory containing documents to be indexed.')
     parser.add_argument('--encoding', type=str, default='utf8',
                         help='Encoding of the input documents.')
@@ -114,11 +174,13 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=str, default="19530",
                         help='Port for the Milvus server.')
     parser.add_argument('--file_type', type=str, default="text", choices=[
-                        "text", "markdown"], help='Type of the input files (text or markdown).')
+                        "text", "markdown", "adoc"], help='Type of the input files (text or markdown).')
     parser.add_argument('--collection_name', type=str, required=True,
                         help='Name of the collection to index the documents into.')
+    parser.add_argument('--github_url', type=str, default=None,
+                        help='URL of the file to download from GitHub (raw content URL).')
 
     args = parser.parse_args()
 
     main(args.input_dir, args.encoding, args.chunk_size, args.chunk_overlap,
-         args.host, args.port, args.file_type, args.collection_name)
+         args.host, args.port, args.file_type, args.collection_name, args.github_url)
