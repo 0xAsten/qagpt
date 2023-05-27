@@ -7,7 +7,6 @@ import argparse
 from langchain.document_loaders import TextLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import Redis
 from langchain.document_loaders import UnstructuredMarkdownLoader
 import logging
 
@@ -122,10 +121,10 @@ def create_redis_index(embeddings, index_name, username, password, host, port,
     return redis_vector
 
 
-def main(input_dir, encoding, chunk_size, chunk_overlap, username, password, host, port, file_type, collection_name):
+def main(input_dir, encoding, chunk_size, chunk_overlap, username, password, host, port, file_type, index_name):
     embeddings = OpenAIEmbeddings()
     redis_vector = create_redis_index(
-        embeddings, collection_name, username, password, host, port)
+        embeddings, index_name, username, password, host, port)
     # Iterate through all the files in the input directory and process each one
     for file in os.listdir(input_dir):
         file_path = os.path.join(input_dir, file)
@@ -137,7 +136,7 @@ def main(input_dir, encoding, chunk_size, chunk_overlap, username, password, hos
             print(f"Indexed {len(docs)} chunks from {file_path}.")
 
 
-# python index_documents.py --input_dir /path/to/your/documents --file_type markdown --collection_name my_collection
+# python index_documents.py --input_dir /path/to/your/documents --file_type markdown --index_name index_name
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Index documents for Question Answering over Documents application.")
@@ -165,4 +164,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args.input_dir, args.encoding, args.chunk_size, args.chunk_overlap,
-         args.username, args.password, args.host, args.port, args.file_type, args.collection_name)
+         args.username, args.password, args.host, args.port, args.file_type, args.index_name)
